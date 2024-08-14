@@ -32,8 +32,7 @@ sleeptime=5
 # url="https://steamcommunity.com/profile/12345678901234567/allcomments"
 
 
-# Example for Steam custom URL: (Change it)
-url="https://steamcommunity.com/id/YOURPROFILE/allcomments"
+
 
 
 
@@ -44,50 +43,47 @@ echo "# Custom Unique Artwork Available!       #"
 echo "# Script Created by NavidArtworks.com    #"
 echo "##########################################"
 
+#!/bin/bash
+
+# Configuration
+savefolder="$(pwd)"  # Save folder is the current directory
+url="https://steamcommunity.com/id/YOURPROFILE/allcomments"  # Replace with your desired Steam profile URL
+tmpfile="/tmp/steam_comments"
+comment_file="all_comments.html"
+
 # Function to download comments page by page
 download_comments() {
     local page=1
     local has_more=true
-    local olddate=""
+
+    # Create or clear the comment file
+    echo "" > "$comment_file"
 
     while $has_more; do
+        # Fetch the comments page with the correct page parameter
         if [[ $page -eq 1 ]]; then
-            curl --silent $url > $tmpfile
+            curl --silent "$url" > "$tmpfile"
         else
-            curl --silent "${url}?ctp=${page}" > $tmpfile
+            curl --silent "${url}?ctp=${page}" > "$tmpfile"
         fi
 
-        newdate=$(egrep -o -m 1 'data\-timestamp\=.([[:digit:]]+).' $tmpfile | egrep -o "[[:digit:]]+")
+        # Check if the file contains comments
+        if grep -q 'commentthread_comment' "$tmpfile"; then
+            echo "Downloading page $page..."
+            
+            # Append the content to the comment file
+            cat "$tmpfile" >> "$comment_file"
 
-        if [[ ! -z $olddate && $olddate != $newdate ]]; then
-            echo "New comment found from: "$(date --date="@$newdate" +%Y%M%d_%H-%M-%S)
-            mv $tmpfile "$(echo $savefolder)/steamcomment_"$(date --date="@$newdate" +%Y%M%d_%H-%M-%S)".html"
-            olddate=$newdate
+            # Increment the page value
             ((page++))
-        elif [[ -z $newdate ]]; then
-            echo -e "Couldn't extract NEWDATE! Maybe the download failed!"
-            ((page++))
-        elif [[ $olddate == $newdate ]]; then
-            # do nothing to avoid console spam
-            :
         else
-            # set olddate, but don't download the page. May miss the first comment of the day
-            if [[ -z $olddate ]]; then
-                echo "Skipping first comment: "$(date --date="@$newdate" +%Y%M%d_%H-%M-%S)
-            fi
-            olddate=$newdate
-            echo "Olddate updated to: "$(date --date="@$olddate" +%Y%M%d_%H-%M-%S)
-        fi
-
-        # Check for the end of comments
-        if ! grep -q 'commentthread_comment' $tmpfile; then
             has_more=false
+            echo "No more comments to download. Finished at page $((page - 1))."
         fi
-
-        sleep $sleeptime
     done
 
-    echo -e "\nDownload complete. All comments have been saved."
+    # Clean up the temporary file
+    rm "$tmpfile"
 }
 
 # Run the function to download comments
